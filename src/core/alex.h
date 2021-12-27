@@ -125,6 +125,8 @@ class Alex {
     long long num_inserts = 0;
     double splitting_time = 0;
     double cost_computation_time = 0;
+    int num_error = 0;
+
   };
   Stats stats_;
 
@@ -906,7 +908,9 @@ class Alex {
   typename self_type::Iterator find(const T& key) {
     stats_.num_lookups++;
     data_node_type* leaf = get_leaf(key);
-    int idx = leaf->find_key(key);
+    std::pair<int, int> res = leaf->find_key(key);
+    int idx = res.first;
+    stats_.num_error += res.second;
     if (idx < 0) {
       return end();
     } else {
@@ -917,7 +921,9 @@ class Alex {
   typename self_type::ConstIterator find(const T& key) const {
     stats_.num_lookups++;
     data_node_type* leaf = get_leaf(key);
-    int idx = leaf->find_key(key);
+    std::pair<int, int> res = leaf->find_key(key);
+    int idx = res.first;
+    stats_.num_error += res.second;
     if (idx < 0) {
       return cend();
     } else {
@@ -984,7 +990,9 @@ class Alex {
   P* get_payload(const T& key) const {
     stats_.num_lookups++;
     data_node_type* leaf = get_leaf(key);
-    int idx = leaf->find_key(key);
+    std::pair<int, int> res = leaf->find_key(key);
+    int idx = res.first;
+    stats_.num_error += res.second;
     if (idx < 0) {
       return nullptr;
     } else {
@@ -2336,6 +2344,30 @@ class Alex {
   // items.
   size_t max_size() const { return size_t(-1); }
 
+  short max_level() const {
+    short max_level = 0;
+    for (NodeIterator node_it = NodeIterator(this); !node_it.is_end();
+         node_it.next()) {
+      AlexNode<T, P>* cur = node_it.current();
+      max_level = std::max(cur->level_, max_level);
+    }
+    return max_level + 1;
+  }
+
+  double avg_level() const {
+    int num_data_nodes = 0;
+    double sum_level = 0;
+    for (NodeIterator node_it = NodeIterator(this); !node_it.is_end();
+         node_it.next()) {
+      AlexNode<T, P>* cur = node_it.current();
+      if (cur->is_leaf_) {
+        sum_level += cur->level_ + 1;
+        num_data_nodes ++;
+      }
+    }
+    return sum_level * 1. / num_data_nodes;
+  }
+
   // Size in bytes of all the keys, payloads, and bitmaps stored in this index
   long long data_size() const {
     long long size = 0;
@@ -2370,6 +2402,35 @@ class Alex {
 
   // Return a const reference to the current statistics
   const struct Stats& get_stats() const { return stats_; }
+
+  void print_stats() {
+    std::cout << "Number keys\t" << stats_.num_keys << std::endl;
+    std::cout << "Number of nodes\t" << num_nodes() << std::endl;
+    std::cout << "Number model nodes\t" << stats_.num_model_nodes << std::endl;
+    std::cout << "Model size\t" << model_size() << std::endl;
+    std::cout << "Avg Model size\t" << model_size() * 1. / stats_.num_model_nodes << std::endl;
+    std::cout << "Number data nodes\t" << stats_.num_data_nodes << std::endl;
+    std::cout << "Data size\t" << data_size() << std::endl;
+    std::cout << "Avg Data size\t" << data_size() * 1. / stats_.num_data_nodes << std::endl;
+    std::cout << "Expand and scales\t" << stats_.num_expand_and_scales << std::endl;
+    std::cout << "Expand and retrains\t" << stats_.num_expand_and_retrains << std::endl;
+    std::cout << "Downward splits\t" << stats_.num_downward_splits << std::endl;
+    std::cout << "Sideways splits\t" << stats_.num_sideways_splits << std::endl;
+    std::cout << "Model node expansion\t" << stats_.num_model_node_expansions << std::endl;
+    std::cout << "Model node splits\t" << stats_.num_model_node_splits << std::endl;
+    std::cout << "Downward split keys\t" << stats_.num_downward_split_keys << std::endl;
+    std::cout << "Sideways split keys\t" << stats_.num_sideways_split_keys << std::endl;
+    std::cout << "Model node expansion pointers\t" << stats_.num_model_node_expansion_pointers << std::endl;
+    std::cout << "Model node split pointers\t" << stats_.num_model_node_split_pointers << std::endl;
+    std::cout << "Node lookups\t" << stats_.num_node_lookups << std::endl;
+    std::cout << "Number lookups\t" << stats_.num_lookups << std::endl;
+    std::cout << "Number inserts\t" << stats_.num_inserts << std::endl;
+    std::cout << "Splitting time\t" << stats_.splitting_time << std::endl;
+    std::cout << "Cost computation time\t" << stats_.cost_computation_time << std::endl;
+    std::cout << "Max level\t" << max_level() << std::endl;
+    std::cout << "Avg level\t" << avg_level() << std::endl;
+    std::cout << "Number error\t" << stats_.num_error << std::endl;
+  }
 
   /*** Debugging ***/
 
